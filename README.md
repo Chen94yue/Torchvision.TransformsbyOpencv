@@ -1,6 +1,24 @@
 # Torchvision.TransformsbyOpencv
 Opencv based implementation of Torchvision.Transforms
 
+使用方法参考cifar10_cls_test.py，所有函数均保持了原torchvsion中函数的使用方法。常用的函数简单对比实验情况如下表所示，基本和原基于PIL的实现方案在相同的效果：
+
+
+测试函数|基于PIL(acc)|基于Opencv(acc)
+--|:--:|--:
+*|53%|54%
+Resize+*|57%|59%
+Resize+CenterCrop+*|46%|47%
+RandomResizeCrop+*|35%|37%
+Reszie+RandomCrop+*|36%|38%
+RandomHorizontalFlip+*|54%|54%
+RandomVerticalFlip+*|45%|48%
+RandomRotation+*|49%|49%
+
+*:Totensor+Normalize
+
+
+
 # functional.py (function)
 
 （\*为较为常用的函数）
