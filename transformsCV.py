@@ -7,8 +7,9 @@ import numbers
 import types
 import collections
 import warnings
+import cv2
 
-from . import functional as F
+import functionalCV as F
 
 __all__ = ["Compose", "ToTensor", "Normalize", "Resize", "Scale", "CenterCrop", "Pad",
            "Lambda", "RandomApply", "RandomChoice", "RandomOrder", "RandomCrop", "RandomHorizontalFlip",
@@ -25,10 +26,11 @@ _pil_interpolation_to_str = {
 '''
 
 _cv2_interpolation_to_str = {
-    cv2.INTER_NEAREST = 'cv2.INTER_NEAREST',
-    cv2.INTER_LINEAR = 'cv2.INTER_LINEAR',
-    cv2.INTER_CUBIC = 'cv2.INTER_CUBIC',
-    cv2.INTER_LANCZOS4 = 'cv2.INTER_LANCZOS4'
+        cv2.INTER_NEAREST: 'cv2.INTER_NEAREST',
+        cv2.INTER_LINEAR: 'cv2.INTER_LINEAR',
+        cv2.INTER_CUBIC: 'cv2.INTER_CUBIC',
+        cv2.INTER_LANCZOS4: 'cv2.INTER_LANCZOS4'
+        }
 
 class Compose(object):
     """Composes several transforms together.
@@ -533,9 +535,9 @@ class RandomResizedCrop(object):
             if random.random() < 0.5:
                 w, h = h, w
 
-            if w <= img.size[0] and h <= img.size[1]:
-                i = random.randint(0, img.size[1] - h)
-                j = random.randint(0, img.size[0] - w)
+            if w <= img.shape[1] and h <= img.shape[0]:
+                i = random.randint(0, img.shape[0] - h)
+                j = random.randint(0, img.shape[1] - w)
                 return i, j, h, w
 
         # Fallback
