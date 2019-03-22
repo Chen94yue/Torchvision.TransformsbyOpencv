@@ -14,6 +14,7 @@ Reszie+RandomCrop+*|36%|38%
 RandomHorizontalFlip+*|54%|54%
 RandomVerticalFlip+*|45%|48%
 RandomRotation+*|49%|49%
+Pad+*|56%|56%
 
 *:Totensor+Normalize
 
