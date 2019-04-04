@@ -253,12 +253,12 @@ input: mean(eg:[0.5, 0.5, 0.5]); scale(defult:[1,1,1])
 
 ## 24. RandomAffine
 
-暂时删除
+add
 
 ## 25. Grayscale
 
-删除
+add
 
 ## 26. RandomGrayscale
 
-删除
+add

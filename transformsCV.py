@@ -735,15 +735,15 @@ class ColorJitter(object):
         """
         transforms = []
         if brightness > 0:
-            brightness_factor = random.uniform(max(0, 1 - brightness), 1 + brightness)
+            brightness_factor =  random.uniform(max(0, 1 - brightness), 1 + brightness)
             transforms.append(Lambda(lambda img: F.adjust_brightness(img, brightness_factor)))
 
         if contrast > 0:
-            contrast_factor = random.uniform(max(0, 1 - contrast), 1 + contrast)
+            contrast_factor =  random.uniform(max(0, 1 - contrast), 1 + contrast)
             transforms.append(Lambda(lambda img: F.adjust_contrast(img, contrast_factor)))
 
         if saturation > 0:
-            saturation_factor = random.uniform(max(0, 1 - saturation), 1 + saturation)
+            saturation_factor =  random.uniform(max(0, 1 - saturation), 1 + saturation)
             transforms.append(Lambda(lambda img: F.adjust_saturation(img, saturation_factor)))
 
         if hue > 0:
@@ -758,10 +758,10 @@ class ColorJitter(object):
     def __call__(self, img):
         """
         Args:
-            img (PIL Image): Input image.
+            img (np.ndarray): Input image.
 
         Returns:
-            PIL Image: Color jittered image.
+            np.ndarray: Color jittered image.
         """
         transform = self.get_params(self.brightness, self.contrast,
                                     self.saturation, self.hue)
@@ -782,11 +782,11 @@ class RandomRotation(object):
     Args:
         degrees (sequence or float or int): Range of degrees to select from.
             If degrees is a number instead of sequence like (min, max), the range of degrees
-            will be (-degrees, +degrees).
-        resample ({PIL.Image.NEAREST, PIL.Image.BILINEAR, PIL.Image.BICUBIC}, optional):
+            will be (-degrees, +degrees) clockwise order.
+        resample ({CV.Image.NEAREST, CV.Image.BILINEAR, CV.Image.BICUBIC}, optional):
             An optional resampling filter.
             See http://pillow.readthedocs.io/en/3.4.x/handbook/concepts.html#filters
-            If omitted, or if the image has mode "1" or "P", it is set to PIL.Image.NEAREST.
+            If omitted, or if the image has mode "1" or "P", it is set to NEAREST.
         expand (bool, optional): Optional expansion flag.
             If true, expands the output to make it large enough to hold the entire rotated image.
             If false or omitted, make the output image the same size as the input image.
@@ -796,7 +796,7 @@ class RandomRotation(object):
             Default is the center of the image.
     """
 
-    def __init__(self, degrees, resample=False, expand=False, center=None):
+    def __init__(self, degrees, resample='BILINEAR', expand=False, center=None):
         if isinstance(degrees, numbers.Number):
             if degrees < 0:
                 raise ValueError("If degrees is a single number, it must be positive.")
@@ -823,10 +823,10 @@ class RandomRotation(object):
 
     def __call__(self, img):
         """
-            img (PIL Image): Image to be rotated.
+            img (np.ndarray): Image to be rotated.
 
         Returns:
-            PIL Image: Rotated image.
+            np.ndarray: Rotated image.
         """
 
         angle = self.get_params(self.degrees)
@@ -859,14 +859,11 @@ class RandomAffine(object):
         shear (sequence or float or int, optional): Range of degrees to select from.
             If degrees is a number instead of sequence like (min, max), the range of degrees
             will be (-degrees, +degrees). Will not apply shear by default
-        resample ({PIL.Image.NEAREST, PIL.Image.BILINEAR, PIL.Image.BICUBIC}, optional):
-            An optional resampling filter.
-            See http://pillow.readthedocs.io/en/3.4.x/handbook/concepts.html#filters
-            If omitted, or if the image has mode "1" or "P", it is set to PIL.Image.NEAREST.
+        resample ({NEAREST, BILINEAR, BICUBIC}, optional): An optional resampling filter.
         fillcolor (int): Optional fill color for the area outside the transform in the output image. (Pillow>=5.0.0)
     """
 
-    def __init__(self, degrees, translate=None, scale=None, shear=None, resample=False, fillcolor=0):
+    def __init__(self, degrees=0, translate=None, scale=None, shear=None, resample='BILINEAR', fillcolor=0):
         if isinstance(degrees, numbers.Number):
             if degrees < 0:
                 raise ValueError("If degrees is a single number, it must be positive.")
@@ -916,8 +913,8 @@ class RandomAffine(object):
         """
         angle = random.uniform(degrees[0], degrees[1])
         if translate is not None:
-            max_dx = translate[0] * img_size[0]
-            max_dy = translate[1] * img_size[1]
+            max_dx = translate[0] * img_size[1]
+            max_dy = translate[1] * img_size[0]
             translations = (np.round(random.uniform(-max_dx, max_dx)),
                             np.round(random.uniform(-max_dy, max_dy)))
         else:
@@ -937,12 +934,12 @@ class RandomAffine(object):
 
     def __call__(self, img):
         """
-            img (PIL Image): Image to be transformed.
+            img (CV Image): Image to be transformed.
 
         Returns:
-            PIL Image: Affine transformed image.
+            CV Image: Affine transformed image.
         """
-        ret = self.get_params(self.degrees, self.translate, self.scale, self.shear, img.size)
+        ret = self.get_params(self.degrees, self.translate, self.scale, self.shear, img.shape)
         return F.affine(img, *ret, resample=self.resample, fillcolor=self.fillcolor)
 
     def __repr__(self):
@@ -959,7 +956,7 @@ class RandomAffine(object):
             s += ', fillcolor={fillcolor}'
         s += ')'
         d = dict(self.__dict__)
-        d['resample'] = _pil_interpolation_to_str[d['resample']]
+        d['resample'] = d['resample']
         return s.format(name=self.__class__.__name__, **d)
 
 
@@ -970,22 +967,22 @@ class Grayscale(object):
         num_output_channels (int): (1 or 3) number of channels desired for output image
 
     Returns:
-        PIL Image: Grayscale version of the input.
+        CV Image: Grayscale version of the input.
         - If num_output_channels == 1 : returned image is single channel
         - If num_output_channels == 3 : returned image is 3 channel with r == g == b
 
     """
 
-    def __init__(self, num_output_channels=1):
+    def __init__(self, num_output_channels=3):
         self.num_output_channels = num_output_channels
 
     def __call__(self, img):
         """
         Args:
-            img (PIL Image): Image to be converted to grayscale.
+            img (CV Image): Image to be converted to grayscale.
 
         Returns:
-            PIL Image: Randomly grayscaled image.
+            CV Image: Randomly grayscaled image.
         """
         return F.to_grayscale(img, num_output_channels=self.num_output_channels)
 
@@ -1000,7 +997,7 @@ class RandomGrayscale(object):
         p (float): probability that image should be converted to grayscale.
 
     Returns:
-        PIL Image: Grayscale version of the input image with probability p and unchanged
+        CV Image: Grayscale version of the input image with probability p and unchanged
         with probability (1-p).
         - If input image is 1 channel: grayscale version is 1 channel
         - If input image is 3 channel: grayscale version is 3 channel with r == g == b
@@ -1013,15 +1010,227 @@ class RandomGrayscale(object):
     def __call__(self, img):
         """
         Args:
-            img (PIL Image): Image to be converted to grayscale.
+            img (np.ndarray): Image to be converted to grayscale.
 
         Returns:
-            PIL Image: Randomly grayscaled image.
+            np.ndarray: Randomly grayscaled image.
         """
-        num_output_channels = 1 if img.mode == 'L' else 3
+        num_output_channels = 3
         if random.random() < self.p:
             return F.to_grayscale(img, num_output_channels=num_output_channels)
         return img
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={0})'.format(self.p)
+
+
+class RandomPerspective(object):
+    """Random perspective transformation of the image keeping center invariant
+        Args:
+            fov(float): range of wide angle = 90+-fov
+            anglex (sequence or float or int): Range of degrees rote around X axis to select from.
+                If degrees is a number instead of sequence like (min, max), the range of degrees
+                will be (-degrees, +degrees). Set to 0 to desactivate rotations.
+            angley (sequence or float or int): Range of degrees rote around Y axis to select from.
+                If degrees is a number instead of sequence like (min, max), the range of degrees
+                will be (-degrees, +degrees). Set to 0 to desactivate rotations.
+            anglez (sequence or float or int): Range of degrees rote around Z axis to select from.
+                If degrees is a number instead of sequence like (min, max), the range of degrees
+                will be (-degrees, +degrees). Set to 0 to desactivate rotations.
+
+            shear (sequence or float or int): Range of degrees for shear rote around axis to select from.
+                If degrees is a number instead of sequence like (min, max), the range of degrees
+                will be (-degrees, +degrees). Set to 0 to desactivate rotations.
+            translate (tuple, optional): tuple of maximum absolute fraction for horizontal
+                and vertical translations. For example translate=(a, b), then horizontal shift
+                is randomly sampled in the range -img_width * a < dx < img_width * a and vertical shift is
+                randomly sampled in the range -img_height * b < dy < img_height * b. Will not translate by default.
+            scale (tuple, optional): scaling factor interval, e.g (a, b), then scale is
+                randomly sampled from the range a <= scale <= b. Will keep original scale by default.
+            resample ({NEAREST, BILINEAR, BICUBIC}, optional): An optional resampling filter.
+            fillcolor (int): Optional fill color for the area outside the transform in the output image. (Pillow>=5.0.0)
+        """
+
+    def __init__(self, fov=0, anglex=0, angley=0, anglez=0, shear=0,
+                 translate=(0, 0), scale=(1, 1), resample='BILINEAR', fillcolor=(0, 0, 0)):
+
+        assert all([isinstance(anglex, (tuple, list)) or anglex >= 0,
+                    isinstance(angley, (tuple, list)) or angley >= 0,
+                    isinstance(anglez, (tuple, list)) or anglez >= 0,
+                    isinstance(shear, (tuple, list)) or shear >= 0]), \
+            'All angles must be positive or tuple or list'
+        assert 80 >= fov >= 0, 'fov should be in (0, 80)'
+        self.fov = fov
+
+        self.anglex = (-anglex, anglex) if isinstance(anglex, numbers.Number) else anglex
+        self.angley = (-angley, angley) if isinstance(angley, numbers.Number) else angley
+        self.anglez = (-anglez, anglez) if isinstance(anglez, numbers.Number) else anglez
+        self.shear = (-shear, shear) if isinstance(shear, numbers.Number) else shear
+
+        assert isinstance(translate, (tuple, list)) and len(translate) == 2, \
+            "translate should be a list or tuple and it must be of length 2."
+        assert all([0.0 <= i <= 1.0 for i in translate]), "translation values should be between 0 and 1"
+        self.translate = translate
+
+        if scale is not None:
+            assert isinstance(scale, (tuple, list)) and len(scale) == 2, \
+                "scale should be a list or tuple and it must be of length 2."
+            assert all([s > 0 for s in scale]), "scale values should be positive"
+        self.scale = scale
+
+        self.resample = resample
+        self.fillcolor = fillcolor
+
+    @staticmethod
+    def get_params(fov_range, anglex_ranges, angley_ranges, anglez_ranges, shear_ranges,
+                   translate, scale_ranges,  img_size):
+        """Get parameters for perspective transformation
+
+        Returns:
+            sequence: params to be passed to the perspective transformation
+        """
+        fov = 90 + random.uniform(-fov_range, fov_range)
+        anglex = random.uniform(anglex_ranges[0], anglex_ranges[1])
+        angley = random.uniform(angley_ranges[0], angley_ranges[1])
+        anglez = random.uniform(anglez_ranges[0], anglez_ranges[1])
+        shear = random.uniform(shear_ranges[0], shear_ranges[1])
+
+        max_dx = translate[0] * img_size[1]
+        max_dy = translate[1] * img_size[0]
+        translations = (np.round(random.uniform(-max_dx, max_dx)),
+                        np.round(random.uniform(-max_dy, max_dy)))
+
+        scale = (random.uniform(1 / scale_ranges[0], scale_ranges[0]),
+                 random.uniform(1 / scale_ranges[1], scale_ranges[1]))
+
+        return fov, anglex, angley, anglez, shear, translations, scale
+
+    def __call__(self, img):
+        """
+            img (np.ndarray): Image to be transformed.
+
+        Returns:
+            np.ndarray: Affine transformed image.
+        """
+        ret = self.get_params(self.fov, self.anglex, self.angley, self.anglez, self.shear,
+                              self.translate, self.scale, img.shape)
+        return F.perspective(img, *ret, resample=self.resample, fillcolor=self.fillcolor)
+
+    def __repr__(self):
+        s = '{name}(degrees={degrees}'
+        if self.translate is not None:
+            s += ', translate={translate}'
+        if self.scale is not None:
+            s += ', scale={scale}'
+        if self.shear is not None:
+            s += ', shear={shear}'
+        if self.resample > 0:
+            s += ', resample={resample}'
+        if self.fillcolor != 0:
+            s += ', fillcolor={fillcolor}'
+        s += ')'
+        d = dict(self.__dict__)
+        d['resample'] = d['resample']
+        return s.format(name=self.__class__.__name__, **d)
+
+
+
+
+
+class RandomGaussianNoise(object):
+    """Applying gaussian noise on the given CV Image randomly with a given probability.
+
+        Args:
+            p (float): probability of the image being noised. Default value is 0.5
+        """
+
+    def __init__(self, p=0.5, mean=0, std=0.1):
+        assert isinstance(mean, numbers.Number) and mean >= 0, 'mean should be a positive value'
+        assert isinstance(std, numbers.Number) and std >= 0, 'std should be a positive value'
+        assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
+        self.p = p
+        self.mean = mean
+        self.std = std
+
+    @staticmethod
+    def get_params(mean, std):
+        """Get parameters for gaussian noise
+
+        Returns:
+            sequence: params to be passed to the affine transformation
+        """
+        mean = random.uniform(-mean, mean)
+        std = random.uniform(-std, std)
+
+        return mean, std
+
+    def __call__(self, img):
+        """
+        Args:
+            img (np.ndarray): Image to be noised.
+
+        Returns:
+            np.ndarray: Randomly noised image.
+        """
+        if random.random() < self.p:
+            return F.gaussian_noise(img, mean=self.mean, std=self.std)
+        return img
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)
+
+
+class RandomPoissonNoise(object):
+    """Applying Poisson noise on the given CV Image randomly with a given probability.
+
+        Args:
+            p (float): probability of the image being noised. Default value is 0.5
+        """
+
+    def __init__(self, p=0.5):
+        assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
+        self.p = p
+
+    def __call__(self, img):
+        """
+        Args:
+            img (np.ndarray): Image to be noised.
+
+        Returns:
+            np.ndarray: Randomly noised image.
+        """
+        if random.random() < self.p:
+            return F.poisson_noise(img)
+        return img
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)
+
+
+class RandomSPNoise(object):
+    """Applying salt and pepper noise on the given CV Image randomly with a given probability.
+
+        Args:
+            p (float): probability of the image being noised. Default value is 0.5
+        """
+
+    def __init__(self, p=0.5, prob=0.1):
+        assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
+        assert isinstance(prob, numbers.Number) and prob >= 0, 'p should be a positive value'
+        self.p = p
+        self.prob = prob
+
+    def __call__(self, img):
+        """
+        Args:
+            img (np.ndarray): Image to be noised.
+
+        Returns:
+            np.ndarray: Randomly noised image.
+        """
+        if random.random() < self.p:
+            return F.salt_and_pepper(img, self.prob)
+        return img
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)

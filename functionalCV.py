@@ -409,67 +409,63 @@ def adjust_brightness(img, brightness_factor):
     """Adjust brightness of an Image.
 
     Args:
-        img (CV2 Image): CV2 Image to be adjusted.
+        img (np.ndarray): CV Image to be adjusted.
         brightness_factor (float):  How much to adjust the brightness. Can be
-            any number. 0 gives the original image.
+            any non negative number. 0 gives a black image, 1 gives the
+            original image while 2 increases the brightness by a factor of 2.
 
     Returns:
-        CV2 Image: Brightness adjusted image.
+        np.ndarray: Brightness adjusted image.
     """
     if not _is_numpy_image(img):
-        raise TypeError('img should be CV2 Image. Got {}'.format(type(img)))
+        raise TypeError('img should be CV Image. Got {}'.format(type(img)))
 
-    # enhancer = ImageEnhance.Brightness(img)
-    # img = enhancer.enhance(brightness_factor)
-    rows, cols, ch = img.shape
-    blank = np.zeros([rows, cols, ch], img.dtype)
-    return cv2.addWeighted(img, 1, blank, 0, brightness_factor)
+    im = img.astype(np.float32) * brightness_factor
+    im = im.clip(min=0, max=255)
+    return im.astype(img.dtype)
 
 
 def adjust_contrast(img, contrast_factor):
     """Adjust contrast of an Image.
 
     Args:
-        img (CV2 Image): CV2 Image to be adjusted.
+        img (np.ndarray): CV Image to be adjusted.
         contrast_factor (float): How much to adjust the contrast. Can be any
             non negative number. 0 gives a solid gray image, 1 gives the
             original image while 2 increases the contrast by a factor of 2.
 
     Returns:
-        CV2 Image: Contrast adjusted image.
+        np.ndarray: Contrast adjusted image.
     """
     if not _is_numpy_image(img):
-        raise TypeError('img should be CV2 Image. Got {}'.format(type(img)))
-
-    # enhancer = ImageEnhance.Contrast(img)
-    # img = enhancer.enhance(contrast_factor)
-    rows, cols, ch = img.shape
-    blank = np.zeros([rows, cols, ch], img.dtype)
-    return cv2.addWeighted(img, contrast_factor, blank, 1-contrast_factor, 0)
+        raise TypeError('img should be CV Image. Got {}'.format(type(img)))
+    im = img.astype(np.float32)
+    mean = round(cv2.cvtColor(im, cv2.COLOR_RGB2GRAY).mean())
+    im = (1-contrast_factor)*mean + contrast_factor * im
+    im = im.clip(min=0, max=255)
+    return im.astype(img.dtype)
 
 
 def adjust_saturation(img, saturation_factor):
     """Adjust color saturation of an image.
 
     Args:
-        img (CV2 Image): CV2 Image to be adjusted.
+        img (np.ndarray): CV Image to be adjusted.
         saturation_factor (float):  How much to adjust the saturation. 0 will
-            give a black and white image, 1 will give the original image while
+            give a gray image, 1 will give the original image while
             2 will enhance the saturation by a factor of 2.
 
     Returns:
-        CV2 Image: Saturation adjusted image.
+        np.ndarray: Saturation adjusted image.
     """
     if not _is_numpy_image(img):
-        raise TypeError('img should be nparray Image. Got {}'.format(type(img)))
+        raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
 
-    # enhancer = ImageEnhance.Color(img)
-    # img = enhancer.enhance(saturation_factor)
-    img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    img_h, img_s, img_v = cv2.split(img_hsv)
-    img_s = (img_s * saturation_factor).astype(np.uint8)
-    img_hsv = cv2.merge([img_h,img_s,img_v])
-    return cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR)
+    im = img.astype(np.float32)
+    degenerate = cv2.cvtColor(cv2.cvtColor(im, cv2.COLOR_RGB2GRAY), cv2.COLOR_GRAY2RGB)
+    im = (1-saturation_factor) * degenerate + saturation_factor * im
+    im = im.clip(min=0, max=255)
+    return im.astype(img.dtype)
 
 
 def adjust_hue(img, hue_factor):
@@ -485,7 +481,7 @@ def adjust_hue(img, hue_factor):
     See https://en.wikipedia.org/wiki/Hue for more details on Hue.
 
     Args:
-        img (CV2 Image): CV2 Image to be adjusted.
+        img (np.ndarray): CV Image to be adjusted.
         hue_factor (float):  How much to shift the hue channel. Should be in
             [-0.5, 0.5]. 0.5 and -0.5 give complete reversal of hue channel in
             HSV space in positive and negative direction respectively.
@@ -493,27 +489,20 @@ def adjust_hue(img, hue_factor):
             with complementary colors while 0 gives the original image.
 
     Returns:
-        CV2 Image: Hue adjusted image.
+        np.ndarray: Hue adjusted image.
     """
     if not(-0.5 <= hue_factor <= 0.5):
         raise ValueError('hue_factor is not in [-0.5, 0.5].'.format(hue_factor))
 
     if not _is_numpy_image(img):
-        raise TypeError('img should be nparray Image. Got {}'.format(type(img)))
+        raise TypeError('img should be CV Image. Got {}'.format(type(img)))
 
-    #input_mode = img.mode
-    #if input_mode in {'L', '1', 'I', 'F'}:
-    #    return img
-    img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    h, s, v = cv2.split(img_hsv)
+    im = img.astype(np.uint8)
+    hsv = cv2.cvtColor(im, cv2.COLOR_RGB2HSV_FULL)
+    hsv[..., 0] += np.uint8(hue_factor * 255)
 
-    # uint8 addition take cares of rotation across boundaries
-    with np.errstate(over='ignore'):
-        h += np.uint8(hue_factor * 255)
-    # h = Image.fromarray(np_h, 'L')
-
-    img_hsv = cv2.merge([h, s, v])
-    return cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR)
+    im = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB_FULL)
+    return im.astype(img.dtype)
 
 
 def adjust_gamma(img, gamma, gain=1):
@@ -584,6 +573,158 @@ def rotate(img, angle, resample=False, expand=False, center=None):
 
 
     return cv2.warpAffine(img, M, (h, w))
+
+
+def affine(img, angle=0, translate=(0, 0), scale=1, shear=0, resample='BILINEAR', fillcolor=(0,0,0)):
+    """Apply affine transformation on the image keeping image center invariant
+    Args:
+        img (np.ndarray): PIL Image to be rotated.
+        angle ({float, int}): rotation angle in degrees between -180 and 180, clockwise direction.
+        translate (list or tuple of integers): horizontal and vertical translations (post-rotation translation)
+        scale (float): overall scale
+        shear (float): shear angle value in degrees between -180 to 180, clockwise direction.
+        resample ({NEAREST, BILINEAR, BICUBIC}, optional):
+            An optional resampling filter.
+            See http://pillow.readthedocs.io/en/3.4.x/handbook/concepts.html#filters
+            If omitted, or if the image has mode "1" or "P", it is set to PIL.Image.NEAREST.
+        fillcolor (int or tuple): Optional fill color for the area outside the transform in the output image. (Pillow>=5.0.0)
+    """
+    if not _is_numpy_image(img):
+        raise TypeError('img should be CV Image. Got {}'.format(type(img)))
+
+    assert isinstance(translate, (tuple, list)) and len(translate) == 2, \
+        "Argument translate should be a list or tuple of length 2"
+
+    assert scale > 0.0, "Argument scale should be positive"
+
+    rows, cols, _ = img.shape
+    center = (cols * 0.5, rows * 0.5)
+    angle = math.radians(angle)
+    shear = math.radians(shear)
+    M00 = math.cos(angle)*scale
+    M01 = -math.sin(angle+shear)*scale
+    M10 = math.sin(angle)*scale
+    M11 = math.cos(angle+shear)*scale
+    M02 = center[0] - center[0]*M00 - center[1]*M01 + translate[0]
+    M12 = center[1] - center[0]*M10 - center[1]*M11 + translate[1]
+    affine_matrix = np.array([[M00, M01, M02], [M10, M11, M12]], dtype=np.float32)
+    dst_img = cv2.warpAffine(img, affine_matrix, (cols, rows), flags=INTER_MODE[resample],
+                             borderMode=cv2.BORDER_CONSTANT, borderValue=fillcolor)
+    return dst_img
+
+
+def perspective(img, fov=45, anglex=0, angley=0, anglez=0, shear=0,
+                translate=(0, 0), scale=(1, 1), resample='BILINEAR', fillcolor=(0, 0, 0)):
+    """
+
+    This function is partly referred to https://blog.csdn.net/dcrmg/article/details/80273818
+
+    """
+
+    imgtype = img.dtype
+    h, w, _ = img.shape
+    centery = h * 0.5
+    centerx = w * 0.5
+
+    alpha = math.radians(shear)
+    beta = math.radians(anglez)
+
+    lambda1 = scale[0]
+    lambda2 = scale[1]
+
+    tx = translate[0]
+    ty = translate[1]
+
+    sina = math.sin(alpha)
+    cosa = math.cos(alpha)
+    sinb = math.sin(beta)
+    cosb = math.cos(beta)
+
+    M00 = cosb * (lambda1 * cosa ** 2 + lambda2 * sina ** 2) - sinb * (lambda2 - lambda1) * sina * cosa
+    M01 = - sinb * (lambda1 * sina ** 2 + lambda2 * cosa ** 2) + cosb * (lambda2 - lambda1) * sina * cosa
+
+    M10 = sinb * (lambda1 * cosa ** 2 + lambda2 * sina ** 2) + cosb * (lambda2 - lambda1) * sina * cosa
+    M11 = + cosb * (lambda1 * sina ** 2 + lambda2 * cosa ** 2) + sinb * (lambda2 - lambda1) * sina * cosa
+    M02 = centerx - M00 * centerx - M01 * centery + tx
+    M12 = centery - M10 * centerx - M11 * centery + ty
+    affine_matrix = np.array([[M00, M01, M02], [M10, M11, M12], [0, 0, 1]], dtype=np.float32)
+    # -------------------------------------------------------------------------------
+    z = np.sqrt(w ** 2 + h ** 2) / 2 / np.tan(math.radians(fov / 2))
+
+    radx = math.radians(anglex)
+    rady = math.radians(angley)
+
+    sinx = math.sin(radx)
+    cosx = math.cos(radx)
+    siny = math.sin(rady)
+    cosy = math.cos(rady)
+
+    r = np.array([[cosy, 0, -siny, 0],
+                  [-siny * sinx, cosx, -sinx * cosy, 0],
+                  [cosx * siny, sinx, cosx * cosy, 0],
+                  [0, 0, 0, 1]])
+
+    pcenter = np.array([centerx, centery, 0, 0], np.float32)
+
+    p1 = np.array([0, 0, 0, 0], np.float32) - pcenter
+    p2 = np.array([w, 0, 0, 0], np.float32) - pcenter
+    p3 = np.array([0, h, 0, 0], np.float32) - pcenter
+    p4 = np.array([w, h, 0, 0], np.float32) - pcenter
+
+    dst1 = r.dot(p1)
+    dst2 = r.dot(p2)
+    dst3 = r.dot(p3)
+    dst4 = r.dot(p4)
+
+    list_dst = [dst1, dst2, dst3, dst4]
+
+    org = np.array([[0, 0],
+                    [w, 0],
+                    [0, h],
+                    [w, h]], np.float32)
+
+    dst = np.zeros((4, 2), np.float32)
+
+    for i in range(4):
+        dst[i, 0] = list_dst[i][0] * z / (z - list_dst[i][2]) + pcenter[0]
+        dst[i, 1] = list_dst[i][1] * z / (z - list_dst[i][2]) + pcenter[1]
+
+    perspective_matrix = cv2.getPerspectiveTransform(org, dst)
+    total_matrix = perspective_matrix @ affine_matrix
+
+    result_img = cv2.warpPerspective(img, total_matrix, (w, h), flags=INTER_MODE[resample],
+                                     borderMode=cv2.BORDER_CONSTANT, borderValue=fillcolor)
+    return result_img.astype(imgtype)
+
+
+def gaussian_noise(img: np.ndarray, mean, std):
+    imgtype = img.dtype
+    gauss = np.random.normal(mean, std, img.shape).astype(np.float32)
+    noisy = np.clip((1 + gauss) * img.astype(np.float32), 0, 255)
+    return noisy.astype(imgtype)
+
+
+def poisson_noise(img):
+    imgtype = img.dtype
+    img = img.astype(np.float32)/255.0
+    vals = len(np.unique(img))
+    vals = 2 ** np.ceil(np.log2(vals))
+    noisy = 255 * np.clip(np.random.poisson(img.astype(np.float32) * vals) / float(vals), 0, 1)
+    return noisy.astype(imgtype)
+
+
+def salt_and_pepper(img, prob=0.01):
+
+    ''' Adds "Salt & Pepper" noise to an image.
+        prob: probability (threshold) that controls level of noise
+    '''
+
+    imgtype = img.dtype
+    rnd = np.random.rand(img.shape[0], img.shape[1])
+    noisy = img.copy()
+    noisy[rnd < prob/2] = 0.0
+    noisy[rnd > 1 - prob/2] = 255.0
+    return noisy.astype(imgtype)
 
 '''
 def _get_inverse_affine_matrix(center, angle, translate, scale, shear):
